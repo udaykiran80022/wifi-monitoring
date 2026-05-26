@@ -33,7 +33,7 @@ export default function PingChart({ data, height = 250 }: PingChartProps) {
           fontFamily="JetBrains Mono"
           tick={{ fill: "#64748b" }}
           interval="preserveStartEnd"
-          minTickGap={20}
+          minTickGap={60}
         />
         <YAxis
           stroke="#475569"

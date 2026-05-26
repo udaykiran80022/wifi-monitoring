@@ -6,6 +6,7 @@ Runs the binary with JSON output and parses the results.
 import asyncio
 import json
 import logging
+import subprocess
 
 from app.config import settings
 
@@ -24,19 +25,22 @@ async def run_speed_test() -> dict | None:
         return None
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            str(settings.SPEEDTEST_EXE),
-            "--format=json",
-            "--accept-license",
-            "--accept-gdpr",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            [
+                str(settings.SPEEDTEST_EXE),
+                "--format=json",
+                "--accept-license",
+                "--accept-gdpr",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-        output = stdout.decode("utf-8", errors="ignore")
+        output = proc.stdout
 
         if proc.returncode != 0:
-            logger.error(f"speedtest.exe returned code {proc.returncode}: {stderr.decode('utf-8', errors='ignore')}")
+            logger.error(f"speedtest.exe returned code {proc.returncode}: {proc.stderr}")
             return None
 
         data = json.loads(output)
@@ -58,7 +62,7 @@ async def run_speed_test() -> dict | None:
             "result_url": result.get("url"),
         }
 
-    except asyncio.TimeoutError:
+    except subprocess.TimeoutExpired:
         logger.error("Speed test timed out after 120 seconds")
         return None
     except json.JSONDecodeError as e:

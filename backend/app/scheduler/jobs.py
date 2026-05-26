@@ -7,12 +7,11 @@ Tracks internet state transitions for DISCONNECTED/RECONNECTED alerts.
 import logging
 from datetime import datetime
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 
 from app.config import settings
 from app.db.session import get_session
-from app.models.tables import InternetStatusLog, SpeedTestLog, Settings as SettingsModel, now_ist
+from app.models.tables import InternetStatusLog, SpeedTestLog, Settings as SettingsModel
 from app.monitoring.ping_monitor import check_internet_ping
 from app.monitoring.wifi_monitor import get_wifi_info
 from app.monitoring.speed_monitor import run_speed_test
@@ -23,13 +22,15 @@ from app.alerts.engine import (
     evaluate_speed_thresholds,
 )
 from app.ws.broadcaster import broadcast_status_update, broadcast_speed_update
+from app.system.tray import update_tray_status
 
 logger = logging.getLogger(__name__)
 
-scheduler = AsyncIOScheduler()
+from app.scheduler.queue import queue_manager
 
 # Module-level state trackers
 _last_internet_state: bool | None = None
+_failed_pings_count: int = 0
 _public_ip_cache: str | None = None
 
 
@@ -68,7 +69,7 @@ async def fast_check_job():
     6. Evaluates ping/packet loss thresholds → creates alerts
     7. Broadcasts live data to all WebSocket clients
     """
-    global _last_internet_state, _public_ip_cache
+    global _last_internet_state, _public_ip_cache, _failed_pings_count
 
     try:
         # Run ping check and wifi check concurrently
@@ -79,13 +80,13 @@ async def fast_check_job():
         )
 
         # Get local IP (fast, sync)
-        local_ip = get_local_ip()
+        ipv4, ipv6, adapter = get_local_ip()
 
         is_connected = ping_result["is_connected"]
         ping_ms = ping_result["avg_ms"]
         packet_loss = ping_result["packet_loss_pct"]
 
-        now = now_ist()
+        now = datetime.utcnow()
 
         # Save to database
         async with get_session() as session:
@@ -96,18 +97,28 @@ async def fast_check_job():
                 packet_loss=packet_loss,
                 wifi_ssid=wifi_info["ssid"],
                 wifi_signal=wifi_info["signal_pct"],
-                local_ip=local_ip,
+                local_ip=ipv4,
+                ipv6_address=ipv6,
+                adapter_name=adapter,
                 public_ip=_public_ip_cache,
             )
             session.add(log_entry)
             await session.commit()
 
-        # Detect state transitions
-        if _last_internet_state is not None and _last_internet_state != is_connected:
-            if not is_connected:
+        # Detect state transitions with retry logic
+        if not is_connected:
+            _failed_pings_count += 1
+        else:
+            _failed_pings_count = 0
+
+        # Only consider disconnected if it failed 3 times in a row
+        effective_state = is_connected or (_failed_pings_count < 3)
+
+        if _last_internet_state is not None and _last_internet_state != effective_state:
+            if not effective_state:
                 await check_and_create_alert(
                     "DISCONNECTED",
-                    "Internet connection lost",
+                    "Internet connection lost (3 consecutive failures)",
                     "critical",
                 )
             else:
@@ -117,7 +128,8 @@ async def fast_check_job():
                     "info",
                 )
 
-        _last_internet_state = is_connected
+        _last_internet_state = effective_state
+        update_tray_status(effective_state)
 
         # Evaluate thresholds (only when connected)
         if is_connected:
@@ -131,13 +143,15 @@ async def fast_check_job():
 
         # Broadcast to WebSocket clients
         await broadcast_status_update({
-            "timestamp": now.isoformat(),
+            "timestamp": now.isoformat() + "Z",
             "is_connected": is_connected,
             "ping_ms": ping_ms,
             "packet_loss": packet_loss,
             "wifi_ssid": wifi_info["ssid"],
             "wifi_signal": wifi_info["signal_pct"],
-            "local_ip": local_ip,
+            "local_ip": ipv4,
+            "ipv6_address": ipv6,
+            "adapter_name": adapter,
             "public_ip": _public_ip_cache,
         })
 
@@ -153,13 +167,17 @@ async def speed_test_job():
     3. Evaluates speed thresholds → creates alerts
     4. Broadcasts speed update to WebSocket clients
     """
+    if _last_internet_state is False:
+        logger.info("Skipping speed test (internet disconnected)")
+        return
+
     try:
         result = await run_speed_test()
         if result is None:
             logger.warning("Speed test returned no results")
             return
 
-        now = now_ist()
+        now = datetime.utcnow()
 
         # Save to database
         async with get_session() as session:
@@ -186,7 +204,7 @@ async def speed_test_job():
 
         # Broadcast to WebSocket clients
         await broadcast_speed_update({
-            "timestamp": now.isoformat(),
+            "timestamp": now.isoformat() + "Z",
             "download_mbps": result["download_mbps"],
             "upload_mbps": result["upload_mbps"],
             "ping_ms": result["ping_ms"],
@@ -217,45 +235,25 @@ async def public_ip_job():
 
 
 def start_scheduler():
-    """Configure and start all scheduled monitoring jobs."""
-    scheduler.add_job(
-        fast_check_job,
-        "interval",
-        seconds=settings.PING_INTERVAL,
-        id="fast_check",
-        replace_existing=True,
-        max_instances=1,
+    """Configure and start all scheduled monitoring jobs using the task queue."""
+    queue_manager.start(num_workers=3)
+    
+    queue_manager.schedule_job(
+        public_ip_job,
+        interval_sec=300,
+        run_immediately=True
     )
-    scheduler.add_job(
+    
+    queue_manager.schedule_job(
+        fast_check_job,
+        interval_sec=settings.PING_INTERVAL,
+        run_immediately=True
+    )
+    
+    queue_manager.schedule_job(
         speed_test_job,
-        "interval",
-        seconds=settings.SPEED_TEST_INTERVAL,
-        id="speed_test",
-        replace_existing=True,
-        max_instances=1,
+        interval_sec=settings.SPEED_TEST_INTERVAL,
+        run_immediately=True
     )
-    scheduler.add_job(
-        public_ip_job,
-        "interval",
-        seconds=300,
-        id="public_ip",
-        replace_existing=True,
-        max_instances=1,
-    )
-
-    # Run public IP check immediately on startup
-    scheduler.add_job(
-        public_ip_job,
-        id="public_ip_startup",
-        replace_existing=True,
-    )
-
-    # Run first fast check immediately
-    scheduler.add_job(
-        fast_check_job,
-        id="fast_check_startup",
-        replace_existing=True,
-    )
-
-    scheduler.start()
-    logger.info("Scheduler started with all monitoring jobs")
+    
+    logger.info("Task queue started with all monitoring jobs")

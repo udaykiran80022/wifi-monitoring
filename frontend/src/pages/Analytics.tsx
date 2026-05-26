@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import SpeedChart from "../components/charts/SpeedChart";
 import UptimeChart from "../components/charts/UptimeChart";
 import PacketLossChart from "../components/charts/PacketLossChart";
-import LoadingSpinner from "../components/shared/LoadingSpinner";
+import HeatmapChart from "../components/charts/HeatmapChart";
+import Skeleton from "../components/shared/Skeleton";
+import { Download } from "lucide-react";
 import {
   getSpeedHistory,
   getDailyAnalytics,
   getHourlyAnalytics,
   getSpeedAverages,
+  getHeatmap,
 } from "../services/api";
-import type { SpeedLog, DailyAnalytics, HourlyAnalytics, SpeedAverage } from "../types";
+import type { SpeedLog, DailyAnalytics, HourlyAnalytics, SpeedAverage, HeatmapData } from "../types";
 import {
   ResponsiveContainer,
   BarChart,
@@ -29,6 +32,7 @@ export default function Analytics() {
   const [dailyAnalytics, setDailyAnalytics] = useState<DailyAnalytics[]>([]);
   const [hourlyAnalytics, setHourlyAnalytics] = useState<HourlyAnalytics[]>([]);
   const [speedAverages, setSpeedAverages] = useState<SpeedAverage[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,18 +42,34 @@ export default function Analytics() {
       getDailyAnalytics(range),
       getHourlyAnalytics(24),
       getSpeedAverages(range),
+      getHeatmap(),
     ])
-      .then(([speed, daily, hourly, averages]) => {
+      .then(([speed, daily, hourly, averages, heatmap]) => {
         setSpeedHistory(speed);
         setDailyAnalytics(daily);
         setHourlyAnalytics(hourly);
         setSpeedAverages(averages);
+        setHeatmapData(heatmap);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [range]);
 
-  if (loading) return <LoadingSpinner />;
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="flex gap-2">
+        <Skeleton className="w-16 h-9" />
+        <Skeleton className="w-16 h-9" />
+        <Skeleton className="w-16 h-9" />
+      </div>
+      <Skeleton className="w-full h-80" />
+      <Skeleton className="w-full h-72" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Skeleton className="w-full h-64" />
+        <Skeleton className="w-full h-64" />
+      </div>
+    </div>
+  );
 
   const avgBarData = speedAverages.map((d) => ({
     date: new Date(d.date).toLocaleDateString("en-US", {
@@ -62,9 +82,10 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      {/* Range Picker */}
-      <div className="flex items-center gap-2">
-        {([7, 30, 90] as RangeOption[]).map((r) => (
+      {/* Header & Range Picker */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {([7, 30, 90] as RangeOption[]).map((r) => (
           <button
             key={r}
             onClick={() => setRange(r)}
@@ -77,6 +98,23 @@ export default function Analytics() {
             {r}d
           </button>
         ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/export/csv"
+            download
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors border border-slate-700"
+          >
+            <Download className="w-4 h-4" /> CSV
+          </a>
+          <a
+            href="/api/export/json"
+            download
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-sm transition-colors border border-slate-700"
+          >
+            <Download className="w-4 h-4" /> JSON
+          </a>
+        </div>
       </div>
 
       {/* Speed History Chart */}
@@ -143,6 +181,14 @@ export default function Analytics() {
             No data available
           </div>
         )}
+      </div>
+
+      {/* Heatmap */}
+      <div className="card">
+        <h3 className="text-sm font-semibold text-white mb-4">
+          Connection Quality Heatmap (All Time)
+        </h3>
+        <HeatmapChart data={heatmapData} />
       </div>
 
       {/* Bottom row: Downtime + Packet Loss */}

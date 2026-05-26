@@ -2,13 +2,13 @@
 Status API endpoints for internet connectivity and WiFi status.
 """
 
-from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta
 
 from app.db.session import get_db_session
-from app.models.tables import InternetStatusLog, now_ist
+from app.models.tables import InternetStatusLog
 from app.schemas.pydantic_models import StatusLogResponse, UptimeResponse
 
 router = APIRouter()
@@ -30,7 +30,7 @@ async def get_status_history(
     session: AsyncSession = Depends(get_db_session),
 ):
     """Get status history for the last N hours."""
-    since = now_ist() - timedelta(hours=hours)
+    since = datetime.utcnow() - timedelta(hours=hours)
     result = await session.execute(
         select(InternetStatusLog)
         .where(InternetStatusLog.timestamp >= since)
@@ -45,7 +45,7 @@ async def get_uptime(
     session: AsyncSession = Depends(get_db_session),
 ):
     """Calculate uptime percentage over the last N hours."""
-    since = now_ist() - timedelta(hours=hours)
+    since = datetime.utcnow() - timedelta(hours=hours)
 
     # Total checks in the period
     total_result = await session.execute(

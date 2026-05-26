@@ -24,33 +24,32 @@ async def get_wifi_info() -> dict:
         stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
         output = stdout.decode("utf-8", errors="ignore")
 
-        def extract(pattern: str) -> str | None:
-            """Extract first capture group matching pattern from output."""
-            m = re.search(pattern, output, re.IGNORECASE | re.MULTILINE)
-            return m.group(1).strip() if m else None
+        # In non-English Windows, "State" or "Signal" might be translated.
+        # However, "SSID", "BSSID", and "%" are almost universally maintained.
+        ssid_match = re.search(r"^\s+SSID\s*:\s*(.+)$", output, re.MULTILINE)
+        bssid_match = re.search(r"BSSID\s*:\s*(.+)", output, re.IGNORECASE)
+        signal_match = re.search(r"(\d+)\s*%", output)
+        adapter_match = re.search(r"Name\s*:\s*(.+)", output, re.IGNORECASE) # "Name" might be translated, but it's a best-effort
 
-        # SSID needs special handling to not match BSSID
-        ssid = extract(r"^\s+SSID\s*:\s*(.+)$")
-        bssid = extract(r"BSSID\s*:\s*(.+)")
-        signal = extract(r"Signal\s*:\s*(\d+)%")
-        radio = extract(r"Radio type\s*:\s*(.+)")
-        auth = extract(r"Authentication\s*:\s*(.+)")
-        state = extract(r"State\s*:\s*(.+)")
-        adapter = extract(r"Name\s*:\s*(.+)")
-        channel = extract(r"Channel\s*:\s*(\d+)")
-        band = extract(r"Band\s*:\s*(.+)")
+        ssid = ssid_match.group(1).strip() if ssid_match else None
+        bssid = bssid_match.group(1).strip() if bssid_match else None
+        signal = int(signal_match.group(1)) if signal_match else None
+        adapter = adapter_match.group(1).strip() if adapter_match else None
+
+        # If we have a BSSID and signal %, we are definitely connected to a network
+        is_connected = bool(bssid and signal is not None)
 
         return {
             "ssid": ssid,
             "bssid": bssid,
-            "signal_pct": int(signal) if signal else None,
-            "radio_type": radio,
-            "authentication": auth,
-            "state": state,
+            "signal_pct": signal,
+            "radio_type": None,
+            "authentication": None,
+            "state": "connected" if is_connected else "disconnected",
             "adapter_name": adapter,
-            "channel": channel,
-            "band": band,
-            "connected": state is not None and state.lower() == "connected",
+            "channel": None,
+            "band": None,
+            "connected": is_connected,
         }
 
     except (asyncio.TimeoutError, Exception):

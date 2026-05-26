@@ -7,24 +7,48 @@ import asyncio
 import socket
 import urllib.request
 import logging
+import psutil
 
 logger = logging.getLogger(__name__)
 
 
-def get_local_ip() -> str | None:
+def get_local_ip() -> tuple[str | None, str | None, str | None]:
     """
-    Get the local IP address by creating a UDP socket to an external host.
-    Does not actually send any data.
+    Get the local IPv4, IPv6, and active adapter name.
+    Returns: (ipv4, ipv6, adapter_name)
     """
     try:
+        # Get active IPv4 by connecting UDP socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.settimeout(2)
         s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
+        ipv4 = s.getsockname()[0]
         s.close()
-        return ip
-    except Exception:
-        return None
+        
+        # Try to find the adapter name and IPv6 matching this IPv4
+        ipv6 = None
+        adapter_name = None
+        
+        # Iterate over all network interfaces
+        for interface_name, addrs in psutil.net_if_addrs().items():
+            has_ipv4 = False
+            temp_ipv6 = None
+            
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address == ipv4:
+                    has_ipv4 = True
+                elif addr.family == socket.AF_INET6:
+                    temp_ipv6 = addr.address.split('%')[0]  # Remove zone index if present
+            
+            if has_ipv4:
+                adapter_name = interface_name
+                ipv6 = temp_ipv6
+                break
+
+        return ipv4, ipv6, adapter_name
+    except Exception as e:
+        logger.error(f"Failed to get local IPs: {e}")
+        return None, None, None
 
 
 async def get_public_ip() -> str | None:

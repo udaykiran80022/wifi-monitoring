@@ -38,12 +38,16 @@ async def ping_host(host: str, count: int = 4) -> dict:
 
         min_match = re.search(r"Minimum = (\d+)ms", output)
         max_match = re.search(r"Maximum = (\d+)ms", output)
+        
+        min_val = float(min_match.group(1)) if min_match else None
+        max_val = float(max_match.group(1)) if max_match else None
 
         return {
             "host": host,
             "avg_ms": avg_ms,
-            "min_ms": float(min_match.group(1)) if min_match else None,
-            "max_ms": float(max_match.group(1)) if max_match else None,
+            "min_ms": min_val,
+            "max_ms": max_val,
+            "jitter_ms": (max_val - min_val) if (max_val is not None and min_val is not None) else 0.0,
             "packet_loss_pct": packet_loss,
             "success": packet_loss < 100.0,
         }
@@ -54,6 +58,7 @@ async def ping_host(host: str, count: int = 4) -> dict:
             "avg_ms": None,
             "min_ms": None,
             "max_ms": None,
+            "jitter_ms": 0.0,
             "packet_loss_pct": 100.0,
             "success": False,
         }
@@ -75,6 +80,7 @@ async def check_internet_ping() -> dict:
         return {
             "is_connected": False,
             "avg_ms": None,
+            "jitter_ms": 0.0,
             "packet_loss_pct": 100.0,
         }
 
@@ -88,5 +94,6 @@ async def check_internet_ping() -> dict:
     return {
         "is_connected": True,
         "avg_ms": best["avg_ms"],
+        "jitter_ms": best["jitter_ms"],
         "packet_loss_pct": round(avg_loss, 2),
     }

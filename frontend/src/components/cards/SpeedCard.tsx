@@ -1,15 +1,37 @@
+import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { useMonitorStore } from "../../store/monitorStore";
+import { getSpeedBaseline } from "../../services/api";
+import type { SpeedBaseline } from "../../types";
 
 export default function SpeedCard() {
   const { downloadMbps, uploadMbps } = useMonitorStore();
+  const [baseline, setBaseline] = useState<SpeedBaseline | null>(null);
+
+  useEffect(() => {
+    getSpeedBaseline().then(setBaseline).catch(console.error);
+  }, []);
+
+  const calculatePercentage = (current: number | null, base: number | undefined | null) => {
+    if (!current || !base) return null;
+    return Math.round((current / base) * 100);
+  };
+
+  const dlPercent = calculatePercentage(downloadMbps, baseline?.download_mbps);
 
   return (
     <div className="card">
-      <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-        Speed
-      </p>
-      <div className="flex items-end gap-6">
+      <div className="flex justify-between items-start mb-3">
+        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+          Speed
+        </p>
+        {dlPercent !== null && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${dlPercent < 80 ? 'bg-red-500/20 text-red-400' : 'bg-accent-cyan/10 text-accent-cyan'}`}>
+            {dlPercent}% of usual
+          </span>
+        )}
+      </div>
+      <div className="flex items-end gap-3 sm:gap-4 flex-wrap">
         {/* Download */}
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-md bg-accent-cyan/10 text-accent-cyan">

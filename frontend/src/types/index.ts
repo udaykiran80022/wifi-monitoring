@@ -58,6 +58,19 @@ export interface HourlyAnalytics {
   check_count: number;
 }
 
+export interface SpeedBaseline {
+  download_mbps: number | null;
+  upload_mbps: number | null;
+  ping_ms: number | null;
+}
+
+export interface HeatmapData {
+  day_of_week: number;
+  hour: number;
+  avg_ping: number | null;
+  disconnected_count: number;
+}
+
 export interface MonitorSettings {
   low_download_mbps: number;
   low_upload_mbps: number;

@@ -2,13 +2,13 @@
 Speed test API endpoints.
 """
 
-from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, desc, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime, timedelta
 
 from app.db.session import get_db_session
-from app.models.tables import SpeedTestLog, now_ist
+from app.models.tables import SpeedTestLog
 from app.schemas.pydantic_models import SpeedTestResponse, SpeedAverageResponse
 
 router = APIRouter()
@@ -29,7 +29,7 @@ async def get_speed_history(
     session: AsyncSession = Depends(get_db_session),
 ):
     """Get speed test history for the last N days."""
-    since = now_ist() - timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
     result = await session.execute(
         select(SpeedTestLog)
         .where(SpeedTestLog.timestamp >= since)
@@ -44,10 +44,10 @@ async def get_speed_averages(
     session: AsyncSession = Depends(get_db_session),
 ):
     """Get average download/upload/ping per day for the last N days."""
-    since = now_ist() - timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
 
     # Group by date and compute averages
-    date_col = func.date(SpeedTestLog.timestamp).label("date")
+    date_col = cast(SpeedTestLog.timestamp, Date).label("date")
     result = await session.execute(
         select(
             date_col,

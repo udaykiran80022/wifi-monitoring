@@ -10,11 +10,18 @@ import type {
   MonitorSettings,
   UptimeInfo,
   SpeedAverage,
+  SpeedBaseline,
+  HeatmapData,
 } from "../types";
+
+const API_TOKEN = import.meta.env.VITE_API_TOKEN || "changeme";
 
 const api = axios.create({
   baseURL: "/api",
   timeout: 15000,
+  headers: {
+    "X-API-Key": API_TOKEN,
+  },
 });
 
 // --- Status ---
@@ -121,6 +128,16 @@ export async function getHourlyAnalytics(
   const { data } = await api.get<HourlyAnalytics[]>("/analytics/hourly", {
     params: { hours },
   });
+  return data;
+}
+
+export async function getSpeedBaseline(): Promise<SpeedBaseline> {
+  const { data } = await api.get<SpeedBaseline>("/analytics/baseline");
+  return data;
+}
+
+export async function getHeatmap(): Promise<HeatmapData[]> {
+  const { data } = await api.get<HeatmapData[]>("/analytics/heatmap");
   return data;
 }
 

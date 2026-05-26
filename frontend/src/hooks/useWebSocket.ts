@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useMonitorStore } from "../store/monitorStore";
+import toast from "react-hot-toast";
 
 export function useWebSocket() {
   const ws = useRef<WebSocket | null>(null);
@@ -9,8 +10,9 @@ export function useWebSocket() {
 
   const connect = useCallback(() => {
     // Determine WebSocket URL based on current location
+    const API_TOKEN = import.meta.env.VITE_API_TOKEN || "changeme";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const wsUrl = `${protocol}//${window.location.host}/ws?token=${API_TOKEN}`;
 
     try {
       ws.current = new WebSocket(wsUrl);
@@ -23,6 +25,17 @@ export function useWebSocket() {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          
+          if (data.type === "alert") {
+            if (data.severity === "critical") {
+              toast.error(data.message, { id: data.id?.toString(), duration: 10000 });
+            } else if (data.severity === "warning") {
+              toast.error(data.message, { id: data.id?.toString(), icon: "⚠️" });
+            } else {
+              toast.success(data.message, { id: data.id?.toString(), icon: "ℹ️" });
+            }
+          }
+          
           setLiveData(data);
         } catch {
           // Ignore malformed messages

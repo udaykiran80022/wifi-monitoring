@@ -3,7 +3,16 @@ Pydantic v2 response schemas for all API endpoints.
 """
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from typing import Annotated
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
+
+UtcDatetime = Annotated[
+    datetime,
+    PlainSerializer(
+        lambda dt: (dt.isoformat() + "Z") if dt.tzinfo is None else dt.isoformat(),
+        return_type=str,
+    )
+]
 
 
 # --- Status Schemas ---
@@ -15,7 +24,7 @@ class StatusLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: datetime
+    timestamp: UtcDatetime
     is_connected: bool
     ping_ms: float | None = None
     packet_loss: float | None = None
@@ -43,7 +52,7 @@ class SpeedTestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: datetime
+    timestamp: UtcDatetime
     download_mbps: float
     upload_mbps: float
     ping_ms: float
@@ -70,7 +79,7 @@ class AlertResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: datetime
+    timestamp: UtcDatetime
     alert_type: str
     message: str
     severity: str
@@ -83,8 +92,8 @@ class AlertResponse(BaseModel):
 class DowntimePeriodResponse(BaseModel):
     """Response schema for a single downtime/outage period."""
 
-    started_at: datetime
-    ended_at: datetime | None = None
+    started_at: UtcDatetime
+    ended_at: UtcDatetime | None = None
     duration_minutes: float
 
 
@@ -119,6 +128,23 @@ class HourlyAnalyticsResponse(BaseModel):
     check_count: int = 0
 
 
+class BaselineResponse(BaseModel):
+    """Response schema for ISP speed baseline."""
+    
+    download_mbps: float | None = None
+    upload_mbps: float | None = None
+    ping_ms: float | None = None
+
+
+class HeatmapResponse(BaseModel):
+    """Response schema for 24x7 heatmap grid."""
+    
+    day_of_week: int
+    hour: int
+    avg_ping: float | None = None
+    disconnected_count: int = 0
+
+
 # --- Settings Schemas ---
 
 
@@ -133,18 +159,18 @@ class SettingsResponse(BaseModel):
     high_packet_loss_pct: float
     ping_interval_sec: int
     speed_test_interval_sec: int
-    updated_at: datetime | None = None
+    updated_at: UtcDatetime | None = None
 
 
 class SettingsUpdateRequest(BaseModel):
     """Request schema for updating settings. All values must be positive."""
 
-    low_download_mbps: float | None = None
-    low_upload_mbps: float | None = None
-    high_ping_ms: float | None = None
-    high_packet_loss_pct: float | None = None
-    ping_interval_sec: int | None = None
-    speed_test_interval_sec: int | None = None
+    low_download_mbps: float | None = Field(default=None, ge=1.0)
+    low_upload_mbps: float | None = Field(default=None, ge=1.0)
+    high_ping_ms: float | None = Field(default=None, ge=1.0)
+    high_packet_loss_pct: float | None = Field(default=None, ge=0.0)
+    ping_interval_sec: int | None = Field(default=None, ge=1)
+    speed_test_interval_sec: int | None = Field(default=None, ge=60)
 
 
 # --- WebSocket Schemas ---

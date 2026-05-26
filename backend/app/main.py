@@ -10,9 +10,12 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.engine import init_db
-from app.scheduler.jobs import start_scheduler, scheduler
+from app.scheduler.jobs import start_scheduler
+from app.scheduler.queue import queue_manager
 from app.api.router import api_router
 from app.ws.manager import manager
+from app.api.auth import verify_api_key
+from fastapi import Depends
 
 # Configure logging
 logging.basicConfig(
@@ -38,8 +41,8 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown
-    scheduler.shutdown(wait=False)
-    logger.info("Scheduler shut down")
+    queue_manager.shutdown()
+    logger.info("Task queue shut down")
 
 
 app = FastAPI(
@@ -63,8 +66,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all API routes
-app.include_router(api_router, prefix="/api")
+# Include all API routes with auth
+app.include_router(api_router, prefix="/api", dependencies=[Depends(verify_api_key)])
 
 
 @app.websocket("/ws")
@@ -73,6 +76,12 @@ async def websocket_endpoint(websocket: WebSocket):
     WebSocket endpoint for real-time data streaming.
     Clients connect here to receive live status and speed updates.
     """
+    token = websocket.query_params.get("token")
+    from app.config import settings
+    if token != settings.API_TOKEN:
+        await websocket.close(code=1008)
+        return
+
     await manager.connect(websocket)
     try:
         while True:

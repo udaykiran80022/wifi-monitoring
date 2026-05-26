@@ -4,13 +4,19 @@ Evaluates current metrics against configured thresholds and creates alerts.
 """
 
 import logging
-from app.models.tables import Alert, now_ist
+import asyncio
+from datetime import datetime
+
+from winotify import Notification, audio
 
 from app.models.tables import Alert
 from app.db.session import get_session
 from app.ws.broadcaster import broadcast_alert
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory tracker for alert states
+_active_alerts = {}
 
 
 async def check_and_create_alert(alert_type: str, message: str, severity: str):
@@ -27,7 +33,7 @@ async def check_and_create_alert(alert_type: str, message: str, severity: str):
             alert_type=alert_type,
             message=message,
             severity=severity,
-            timestamp=now_ist(),
+            timestamp=datetime.utcnow(),
         )
         session.add(alert)
         await session.commit()
@@ -36,7 +42,7 @@ async def check_and_create_alert(alert_type: str, message: str, severity: str):
         # Broadcast the new alert to all WebSocket clients
         await broadcast_alert({
             "id": alert.id,
-            "timestamp": alert.timestamp.isoformat(),
+            "timestamp": alert.timestamp.isoformat() + "Z",
             "alert_type": alert.alert_type,
             "message": alert.message,
             "severity": alert.severity,
@@ -44,6 +50,23 @@ async def check_and_create_alert(alert_type: str, message: str, severity: str):
         })
 
         logger.info(f"Alert created: [{severity.upper()}] {alert_type} - {message}")
+
+        # Send Windows Toast Notification in a background thread only for critical alerts
+        if severity == "critical":
+            def _send_toast():
+                try:
+                    toast = Notification(
+                        app_id="WiFi Monitor",
+                        title=f"❌ {alert_type.replace('_', ' ').title()}",
+                        msg=message,
+                        duration="short"
+                    )
+                    toast.set_audio(audio.LoopingAlarm, loop=False)
+                    toast.show()
+                except Exception as e:
+                    logger.error(f"Failed to send Windows Toast: {e}")
+
+            asyncio.create_task(asyncio.to_thread(_send_toast))
 
 
 async def evaluate_ping_thresholds(
@@ -61,19 +84,41 @@ async def evaluate_ping_thresholds(
         high_ping_ms: Threshold for high ping alert
         high_packet_loss_pct: Threshold for high packet loss alert
     """
+    global _active_alerts
+
     if ping_ms is not None and ping_ms > high_ping_ms:
-        await check_and_create_alert(
-            "HIGH_PING",
-            f"Ping is {ping_ms}ms (threshold: {high_ping_ms}ms)",
-            "warning",
-        )
+        if not _active_alerts.get("HIGH_PING"):
+            _active_alerts["HIGH_PING"] = True
+            await check_and_create_alert(
+                "HIGH_PING",
+                f"Ping is {ping_ms}ms (threshold: {high_ping_ms}ms)",
+                "warning",
+            )
+    else:
+        if _active_alerts.get("HIGH_PING"):
+            _active_alerts["HIGH_PING"] = False
+            await check_and_create_alert(
+                "PING_RECOVERED",
+                "Ping has recovered to normal levels",
+                "info",
+            )
 
     if packet_loss > high_packet_loss_pct:
-        await check_and_create_alert(
-            "HIGH_PACKET_LOSS",
-            f"Packet loss is {packet_loss}% (threshold: {high_packet_loss_pct}%)",
-            "warning",
-        )
+        if not _active_alerts.get("HIGH_PACKET_LOSS"):
+            _active_alerts["HIGH_PACKET_LOSS"] = True
+            await check_and_create_alert(
+                "HIGH_PACKET_LOSS",
+                f"Packet loss is {packet_loss}% (threshold: {high_packet_loss_pct}%)",
+                "warning",
+            )
+    else:
+        if _active_alerts.get("HIGH_PACKET_LOSS"):
+            _active_alerts["HIGH_PACKET_LOSS"] = False
+            await check_and_create_alert(
+                "PACKET_LOSS_RECOVERED",
+                "Packet loss has recovered to normal levels",
+                "info",
+            )
 
 
 async def evaluate_speed_thresholds(
@@ -91,16 +136,38 @@ async def evaluate_speed_thresholds(
         low_download_mbps: Threshold for low download alert
         low_upload_mbps: Threshold for low upload alert
     """
+    global _active_alerts
+
     if download < low_download_mbps:
-        await check_and_create_alert(
-            "LOW_DOWNLOAD",
-            f"Download speed {download} Mbps is below threshold ({low_download_mbps} Mbps)",
-            "warning",
-        )
+        if not _active_alerts.get("LOW_DOWNLOAD"):
+            _active_alerts["LOW_DOWNLOAD"] = True
+            await check_and_create_alert(
+                "LOW_DOWNLOAD",
+                f"Download speed {download} Mbps is below threshold ({low_download_mbps} Mbps)",
+                "warning",
+            )
+    else:
+        if _active_alerts.get("LOW_DOWNLOAD"):
+            _active_alerts["LOW_DOWNLOAD"] = False
+            await check_and_create_alert(
+                "DOWNLOAD_RECOVERED",
+                f"Download speed {download} Mbps has recovered",
+                "info",
+            )
 
     if upload < low_upload_mbps:
-        await check_and_create_alert(
-            "LOW_UPLOAD",
-            f"Upload speed {upload} Mbps is below threshold ({low_upload_mbps} Mbps)",
-            "warning",
-        )
+        if not _active_alerts.get("LOW_UPLOAD"):
+            _active_alerts["LOW_UPLOAD"] = True
+            await check_and_create_alert(
+                "LOW_UPLOAD",
+                f"Upload speed {upload} Mbps is below threshold ({low_upload_mbps} Mbps)",
+                "warning",
+            )
+    else:
+        if _active_alerts.get("LOW_UPLOAD"):
+            _active_alerts["LOW_UPLOAD"] = False
+            await check_and_create_alert(
+                "UPLOAD_RECOVERED",
+                f"Upload speed {upload} Mbps has recovered",
+                "info",
+            )

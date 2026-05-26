@@ -7,6 +7,7 @@ import UptimeCard from "../components/cards/UptimeCard";
 import WifiCard from "../components/cards/WifiCard";
 import PingChart from "../components/charts/PingChart";
 import AlertItem from "../components/shared/AlertItem";
+import Skeleton from "../components/shared/Skeleton";
 import { getAlerts, getLatestSpeed } from "../services/api";
 import type { Alert, SpeedLog } from "../types";
 import { Server, Globe } from "lucide-react";
@@ -15,18 +16,35 @@ export default function Dashboard() {
   const { pingHistory, latestSpeed } = useMonitorStore();
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [lastSpeed, setLastSpeed] = useState<SpeedLog | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAlerts(5)
-      .then(setRecentAlerts)
-      .catch(() => {});
-    getLatestSpeed()
-      .then(setLastSpeed)
-      .catch(() => {});
+    Promise.all([getAlerts(5), getLatestSpeed()])
+      .then(([alerts, speed]) => {
+        setRecentAlerts(alerts);
+        setLastSpeed(speed);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   // Use WebSocket speed data if available, otherwise REST data
   const speedData = latestSpeed || lastSpeed;
+
+  if (loading) return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="w-full h-32" />
+        ))}
+      </div>
+      <Skeleton className="w-full h-64" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Skeleton className="w-full h-64" />
+        <Skeleton className="w-full h-64" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">

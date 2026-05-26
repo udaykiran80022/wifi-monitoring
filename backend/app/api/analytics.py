@@ -5,12 +5,12 @@ Provides aggregated daily and hourly statistics.
 
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Integer, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
-from app.models.tables import InternetStatusLog, SpeedTestLog, now_ist
-from app.schemas.pydantic_models import DailyAnalyticsResponse, HourlyAnalyticsResponse
+from app.models.tables import InternetStatusLog, SpeedTestLog
+from app.schemas.pydantic_models import DailyAnalyticsResponse, HourlyAnalyticsResponse, BaselineResponse, HeatmapResponse
 
 router = APIRouter()
 
@@ -24,8 +24,8 @@ async def get_daily_analytics(
     Get per-day analytics for the last N days.
     Includes average speeds, ping, downtime minutes, and outage count.
     """
-    since = now_ist() - timedelta(days=days)
-    date_col = func.date(SpeedTestLog.timestamp).label("date")
+    since = datetime.utcnow() - timedelta(days=days)
+    date_col = cast(SpeedTestLog.timestamp, Date).label("date")
 
     # Speed averages per day
     speed_result = await session.execute(
@@ -42,7 +42,6 @@ async def get_daily_analytics(
     speed_by_date = {str(r.date): r for r in speed_result.all()}
 
     # Status logs for downtime computation
-    status_date_col = func.date(InternetStatusLog.timestamp).label("date")
     status_result = await session.execute(
         select(InternetStatusLog)
         .where(InternetStatusLog.timestamp >= since)
@@ -95,10 +94,10 @@ async def get_hourly_analytics(
     Get per-hour averages for the last N hours.
     Returns average ping and packet loss per hour.
     """
-    since = now_ist() - timedelta(hours=hours)
+    since = datetime.utcnow() - timedelta(hours=hours)
 
-    # Use strftime for hour grouping in SQLite
-    hour_col = func.strftime("%Y-%m-%d %H:00", InternetStatusLog.timestamp).label("hour")
+    # Use date_trunc for hour grouping in PostgreSQL
+    hour_col = func.date_trunc("hour", InternetStatusLog.timestamp).label("hour")
 
     result = await session.execute(
         select(
@@ -115,10 +114,71 @@ async def get_hourly_analytics(
     rows = result.all()
     return [
         HourlyAnalyticsResponse(
-            hour=str(row.hour),
+            hour=str(row.hour.strftime("%Y-%m-%d %H:00")) if row.hour else str(row.hour),
             avg_ping=round(row.avg_ping, 2) if row.avg_ping else None,
             avg_packet_loss=round(row.avg_packet_loss, 2) if row.avg_packet_loss else None,
             check_count=row.check_count,
         )
         for row in rows
+    ]
+
+
+@router.get("/baseline", response_model=BaselineResponse)
+async def get_speed_baseline(session: AsyncSession = Depends(get_db_session)):
+    """
+    Get the baseline speed based on the first 10 speed tests.
+    """
+    result = await session.execute(
+        select(SpeedTestLog)
+        .order_by(SpeedTestLog.timestamp.asc())
+        .limit(10)
+    )
+    logs = result.scalars().all()
+    
+    if not logs:
+        return BaselineResponse()
+        
+    avg_dl = sum(l.download_mbps for l in logs) / len(logs)
+    avg_ul = sum(l.upload_mbps for l in logs) / len(logs)
+    avg_ping = sum(l.ping_ms for l in logs) / len(logs)
+    
+    return BaselineResponse(
+        download_mbps=round(avg_dl, 2),
+        upload_mbps=round(avg_ul, 2),
+        ping_ms=round(avg_ping, 2)
+    )
+
+
+@router.get("/heatmap", response_model=list[HeatmapResponse])
+async def get_heatmap(session: AsyncSession = Depends(get_db_session)):
+    """
+    Get connection quality grouped by day of week (0-6, Sunday=0) and hour (0-23).
+    """
+    # PostgreSQL extract('dow') returns 0=Sunday, 1=Monday ... 6=Saturday
+    # PostgreSQL extract('hour') returns 0-23
+    day_col = cast(func.extract("dow", InternetStatusLog.timestamp), Integer).label("day_of_week")
+    hour_col = cast(func.extract("hour", InternetStatusLog.timestamp), Integer).label("hour")
+    
+    result = await session.execute(
+        select(
+            day_col,
+            hour_col,
+            func.avg(InternetStatusLog.ping_ms).label("avg_ping"),
+            func.sum(
+                1 - cast(InternetStatusLog.is_connected, Integer)
+            ).label("disconnected_count")
+        )
+        .group_by(day_col, hour_col)
+    )
+    
+    rows = result.all()
+    return [
+        HeatmapResponse(
+            day_of_week=row.day_of_week,
+            hour=row.hour,
+            avg_ping=round(row.avg_ping, 2) if row.avg_ping else None,
+            disconnected_count=row.disconnected_count or 0
+        )
+        for row in rows
+        if row.day_of_week is not None and row.hour is not None
     ]

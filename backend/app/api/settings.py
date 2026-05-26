@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
-from app.models.tables import Settings, now_ist
+from app.models.tables import Settings
 from app.schemas.pydantic_models import SettingsResponse, SettingsUpdateRequest
 
 router = APIRouter()
@@ -54,7 +54,7 @@ async def update_settings(
     for key, value in update_data.items():
         setattr(row, key, value)
 
-    row.updated_at = now_ist()
+    row.updated_at = datetime.utcnow()
     await session.commit()
     await session.refresh(row)
 

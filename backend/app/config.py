@@ -11,20 +11,23 @@ import os
 class Settings(BaseSettings):
     """All application configuration with sensible defaults."""
 
-    # Paths
-    APP_DATA_DIR: Path = Path(os.environ.get("APPDATA", ".")) / "WiFiMonitor"
-    DB_PATH: Path = Path(os.environ.get("APPDATA", ".")) / "WiFiMonitor" / "monitor.db"
+    # Database
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "postgresql+asyncpg://postgres:admin123@localhost:5432/postgres",
+    )
     SPEEDTEST_EXE: Path = Path(os.environ.get("APPDATA", ".")) / "WiFiMonitor" / "speedtest.exe"
     LOG_FILE: Path = Path(os.environ.get("APPDATA", ".")) / "WiFiMonitor" / "monitor.log"
 
-    # Server
-    HOST: str = "127.0.0.1"
-    PORT: int = 8765
+    # Server config
+    HOST: str = os.getenv("HOST", "127.0.0.1")
+    PORT: int = int(os.getenv("PORT", "8765"))
+    API_TOKEN: str = os.getenv("API_TOKEN", "changeme")
 
     # Monitoring intervals (seconds)
     PING_INTERVAL: int = 5
     WIFI_CHECK_INTERVAL: int = 10
-    SPEED_TEST_INTERVAL: int = 900  # 15 minutes
+    SPEED_TEST_INTERVAL: int = 3600
 
     # Ping targets
     PING_HOSTS: list[str] = ["8.8.8.8", "1.1.1.1", "8.8.4.4"]
@@ -43,5 +46,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Ensure app data dir exists
-settings.APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure log directory exists
+settings.LOG_FILE.parent.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,6 @@ SQLAlchemy ORM models for all database tables.
 """
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from sqlalchemy import (
     Column,
     Integer,
@@ -17,9 +16,6 @@ from sqlalchemy import (
 
 from app.db.engine import Base
 
-def now_ist():
-    return datetime.now(ZoneInfo("Asia/Kolkata"))
-
 
 class InternetStatusLog(Base):
     """Stores periodic internet connectivity and WiFi status snapshots."""
@@ -27,7 +23,7 @@ class InternetStatusLog(Base):
     __tablename__ = "internet_status_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, nullable=False, default=now_ist)
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
     is_connected = Column(Boolean, nullable=False)
     ping_ms = Column(Float, nullable=True)
     packet_loss = Column(Float, nullable=True)
@@ -35,6 +31,9 @@ class InternetStatusLog(Base):
     wifi_signal = Column(Integer, nullable=True)
     local_ip = Column(String(45), nullable=True)
     public_ip = Column(String(45), nullable=True)
+    jitter_ms = Column(Float, nullable=True)
+    ipv6_address = Column(String(45), nullable=True)
+    adapter_name = Column(String(100), nullable=True)
 
 
 class SpeedTestLog(Base):
@@ -43,7 +42,7 @@ class SpeedTestLog(Base):
     __tablename__ = "speed_test_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, nullable=False, default=now_ist)
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
     download_mbps = Column(Float, nullable=False)
     upload_mbps = Column(Float, nullable=False)
     ping_ms = Column(Float, nullable=False)
@@ -58,7 +57,7 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, nullable=False, default=now_ist)
+    timestamp = Column(DateTime, nullable=False, server_default=func.now())
     alert_type = Column(String(50), nullable=False)
     message = Column(Text, nullable=False)
     severity = Column(String(20), nullable=False)
@@ -76,5 +75,10 @@ class Settings(Base):
     high_ping_ms = Column(Float, nullable=False, default=150.0)
     high_packet_loss_pct = Column(Float, nullable=False, default=5.0)
     ping_interval_sec = Column(Integer, nullable=False, default=5)
-    speed_test_interval_sec = Column(Integer, nullable=False, default=900)
+    speed_test_interval_sec = Column(Integer, nullable=False, default=3600)
+    smtp_server = Column(String(200), nullable=True)
+    smtp_user = Column(String(100), nullable=True)
+    smtp_pass = Column(String(100), nullable=True)
+    webhook_url = Column(String(500), nullable=True)
+    speed_provider = Column(String(50), nullable=False, default="ookla")
     updated_at = Column(DateTime, nullable=True)
