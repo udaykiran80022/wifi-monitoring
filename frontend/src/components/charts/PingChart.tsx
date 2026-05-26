@@ -1,5 +1,4 @@
 import {
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
@@ -7,69 +6,54 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
+import { ChartContainer } from "./ChartContainer";
+import {
+  chartColors,
+  tooltipStyle,
+  axisDefaults,
+  gridDefaults,
+  chartMargin,
+  yAxisLabel,
+} from "./chartConfig";
 
 interface PingChartProps {
-  data: Array<{ time: string; ping: number }>;
+  data: Array<{ time: string; ping: number | null }>;
   height?: number;
 }
 
 export default function PingChart({ data, height = 250 }: PingChartProps) {
-  if (data.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[250px] text-slate-500 text-sm">
-        Collecting ping data...
-      </div>
-    );
-  }
-
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+    <ChartContainer
+      height={height}
+      isEmpty={data.length === 0}
+      emptyMessage="Collecting ping data..."
+      aria-label={`Real-time ping latency chart showing ${data.length} data points`}
+    >
+      <LineChart data={data} margin={chartMargin}>
+        <CartesianGrid {...gridDefaults} />
         <XAxis
           dataKey="time"
-          stroke="#475569"
+          {...axisDefaults}
           fontSize={10}
-          fontFamily="JetBrains Mono"
-          tick={{ fill: "#64748b" }}
           interval="preserveStartEnd"
           minTickGap={60}
         />
-        <YAxis
-          stroke="#475569"
-          fontSize={11}
-          fontFamily="JetBrains Mono"
-          tick={{ fill: "#64748b" }}
-          label={{
-            value: "ms",
-            angle: -90,
-            position: "insideLeft",
-            fill: "#64748b",
-            fontSize: 11,
-          }}
-        />
+        <YAxis {...axisDefaults} label={yAxisLabel("ms")} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: "#0f1629",
-            border: "1px solid rgba(255,255,255,0.07)",
-            borderRadius: "8px",
-            fontSize: "12px",
-            fontFamily: "JetBrains Mono",
-          }}
-          labelStyle={{ color: "#94a3b8" }}
+          {...tooltipStyle}
           formatter={(value: unknown) => [`${value}ms`, "Ping"]}
         />
         <Line
           type="monotone"
           dataKey="ping"
-          stroke="#f59e0b"
+          stroke={chartColors.amber}
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4, fill: "#f59e0b" }}
+          activeDot={{ r: 4, fill: chartColors.amber }}
           isAnimationActive={false}
           connectNulls={false}
         />
       </LineChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   );
 }

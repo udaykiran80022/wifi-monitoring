@@ -162,7 +162,7 @@ async def fast_check_job():
 
 async def speed_test_job():
     """
-    Speed test job that runs every 15 minutes.
+    Speed test job that runs at a configurable interval.
     1. Runs Ookla speedtest.exe
     2. Saves result to database
     3. Evaluates speed thresholds → creates alerts
@@ -171,6 +171,10 @@ async def speed_test_job():
     if _last_internet_state is False:
         logger.info("Skipping speed test (internet disconnected)")
         return
+
+    logger.info("Starting speed test...")
+    import time as _time
+    _start = _time.monotonic()
 
     try:
         result = await run_speed_test()
@@ -214,7 +218,8 @@ async def speed_test_job():
         })
 
         logger.info(
-            f"Speed test: ↓{result['download_mbps']}Mbps ↑{result['upload_mbps']}Mbps "
+            f"Speed test completed in {_time.monotonic() - _start:.1f}s: "
+            f"↓{result['download_mbps']}Mbps ↑{result['upload_mbps']}Mbps "
             f"Ping:{result['ping_ms']}ms"
         )
 
@@ -235,6 +240,20 @@ async def public_ip_job():
         logger.error(f"Public IP job error: {e}", exc_info=True)
 
 
+async def _get_ping_interval() -> int:
+    """Read the current ping interval from the database."""
+    db_settings = await _get_db_settings()
+    interval = db_settings["ping_interval_sec"]
+    return interval
+
+
+async def _get_speed_test_interval() -> int:
+    """Read the current speed test interval from the database."""
+    db_settings = await _get_db_settings()
+    interval = db_settings["speed_test_interval_sec"]
+    logger.info(f"Speed test interval from DB: {interval}s")
+    return interval
+
 def start_scheduler():
     """Configure and start all scheduled monitoring jobs using the task queue."""
     queue_manager.start(num_workers=3)
@@ -248,13 +267,15 @@ def start_scheduler():
     queue_manager.schedule_job(
         fast_check_job,
         interval_sec=settings.PING_INTERVAL,
-        run_immediately=True
+        run_immediately=True,
+        interval_getter=_get_ping_interval,
     )
     
     queue_manager.schedule_job(
         speed_test_job,
         interval_sec=settings.SPEED_TEST_INTERVAL,
-        run_immediately=True
+        run_immediately=True,
+        interval_getter=_get_speed_test_interval,
     )
     
     logger.info("Task queue started with all monitoring jobs")

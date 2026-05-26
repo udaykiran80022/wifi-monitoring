@@ -1,8 +1,8 @@
 import { Wifi } from "lucide-react";
-import { useMonitorStore } from "../../store/monitorStore";
+import { useWifiInfo } from "../../store/monitorStore";
 
 export default function WifiCard() {
-  const { wifiSsid, wifiSignal } = useMonitorStore();
+  const { wifiSsid, wifiSignal } = useWifiInfo();
 
   const getSignalColor = () => {
     if (wifiSignal == null) return "text-slate-400";

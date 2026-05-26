@@ -1,8 +1,8 @@
 import { Wifi, WifiOff } from "lucide-react";
-import { useMonitorStore } from "../../store/monitorStore";
+import { useIsConnected } from "../../store/monitorStore";
 
 export default function StatusCard() {
-  const { isConnected } = useMonitorStore();
+  const isConnected = useIsConnected();
 
   return (
     <div

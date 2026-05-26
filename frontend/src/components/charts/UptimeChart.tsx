@@ -1,5 +1,5 @@
+import { useMemo } from "react";
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
@@ -8,6 +8,15 @@ import {
   Tooltip,
   Cell,
 } from "recharts";
+import { ChartContainer } from "./ChartContainer";
+import {
+  chartColors,
+  tooltipStyle,
+  axisDefaults,
+  gridDefaults,
+  chartMargin,
+  yAxisLabel,
+} from "./chartConfig";
 import type { DailyAnalytics } from "../../types";
 
 interface UptimeChartProps {
@@ -16,56 +25,32 @@ interface UptimeChartProps {
 }
 
 export default function UptimeChart({ data, height = 250 }: UptimeChartProps) {
-  const chartData = data.map((d) => ({
-    date: new Date(d.date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    }),
-    downtime: d.downtime_minutes,
-    outages: d.outage_count,
-  }));
-
-  if (chartData.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[250px] text-slate-500 text-sm">
-        No analytics data available yet
-      </div>
-    );
-  }
+  const chartData = useMemo(
+    () =>
+      data.map((d) => ({
+        date: new Date(d.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        downtime: d.downtime_minutes,
+        outages: d.outage_count,
+      })),
+    [data]
+  );
 
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-        <XAxis
-          dataKey="date"
-          stroke="#475569"
-          fontSize={11}
-          fontFamily="JetBrains Mono"
-          tick={{ fill: "#64748b" }}
-        />
-        <YAxis
-          stroke="#475569"
-          fontSize={11}
-          fontFamily="JetBrains Mono"
-          tick={{ fill: "#64748b" }}
-          label={{
-            value: "min",
-            angle: -90,
-            position: "insideLeft",
-            fill: "#64748b",
-            fontSize: 11,
-          }}
-        />
+    <ChartContainer
+      height={height}
+      isEmpty={chartData.length === 0}
+      emptyMessage="No analytics data available yet"
+      aria-label="Daily downtime bar chart"
+    >
+      <BarChart data={chartData} margin={chartMargin}>
+        <CartesianGrid {...gridDefaults} />
+        <XAxis dataKey="date" {...axisDefaults} />
+        <YAxis {...axisDefaults} label={yAxisLabel("min")} />
         <Tooltip
-          contentStyle={{
-            backgroundColor: "#0f1629",
-            border: "1px solid rgba(255,255,255,0.07)",
-            borderRadius: "8px",
-            fontSize: "12px",
-            fontFamily: "JetBrains Mono",
-          }}
-          labelStyle={{ color: "#94a3b8" }}
+          {...tooltipStyle}
           formatter={(value: unknown, name: unknown) => {
             if (name === "downtime") return [`${Number(value).toFixed(1)} min`, "Downtime"];
             return [`${value}`, `${name}`];
@@ -75,12 +60,12 @@ export default function UptimeChart({ data, height = 250 }: UptimeChartProps) {
           {chartData.map((entry, index) => (
             <Cell
               key={index}
-              fill={entry.downtime > 10 ? "#ef4444" : entry.downtime > 0 ? "#f59e0b" : "#10b981"}
+              fill={entry.downtime > 10 ? chartColors.red : entry.downtime > 0 ? chartColors.amber : chartColors.emerald}
               opacity={0.8}
             />
           ))}
         </Bar>
       </BarChart>
-    </ResponsiveContainer>
+    </ChartContainer>
   );
 }

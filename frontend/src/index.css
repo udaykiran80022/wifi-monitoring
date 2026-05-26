@@ -24,6 +24,7 @@
   --accent-purple: #8b5cf6;
   --accent-purple-dim: rgba(139, 92, 246, 0.15);
   --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
   --topbar-height: 64px;
 }
 
@@ -47,7 +48,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* ─── Scrollbar ─── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -66,12 +67,12 @@ body {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Mono font utility */
+/* ─── Mono font utility ─── */
 .font-mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Card base */
+/* ─── Card base ─── */
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -85,7 +86,7 @@ body {
   box-shadow: 0 0 20px rgba(0, 212, 255, 0.03);
 }
 
-/* Grid background pattern */
+/* ─── Grid background pattern ─── */
 .grid-bg {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
@@ -93,7 +94,7 @@ body {
   background-size: 40px 40px;
 }
 
-/* Status dot animations */
+/* ─── Status dot animations ─── */
 @keyframes pulse-green {
   0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
   50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
@@ -121,7 +122,7 @@ body {
   animation: pulse-amber 1s ease-in-out infinite;
 }
 
-/* Glow effects */
+/* ─── Glow effects ─── */
 .glow-cyan {
   box-shadow: 0 0 15px rgba(0, 212, 255, 0.1), 0 0 30px rgba(0, 212, 255, 0.05);
 }
@@ -134,22 +135,7 @@ body {
   box-shadow: 0 0 15px rgba(239, 68, 68, 0.1), 0 0 30px rgba(239, 68, 68, 0.05);
 }
 
-/* Fade in animation */
-@keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.animate-fade-in {
-  animation: fade-in 0.4s ease-out;
-}
-
-/* Shimmer loading */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
+/* ─── Shimmer loading ─── */
 .shimmer {
   background: linear-gradient(90deg,
     var(--bg-tertiary) 25%,
@@ -160,7 +146,7 @@ body {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* Chart tooltip override */
+/* ─── Chart tooltip override ─── */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
   background: var(--bg-secondary) !important;
   border: 1px solid var(--border-color) !important;
@@ -172,9 +158,64 @@ body {
   color: var(--text-primary) !important;
 }
 
-/* Number transition */
+/* ─── Number transition ─── */
 .number-value {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 600;
   letter-spacing: -0.02em;
+}
+
+/* ─── Focus visible ─── */
+:focus-visible {
+  outline: 2px solid rgba(0, 212, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove default focus outline - use focus-visible instead */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .status-dot-connected,
+  .status-dot-disconnected,
+  .status-dot-reconnecting {
+    animation: none !important;
+  }
+
+  .animate-fade-in,
+  .animate-pulse,
+  .animate-spin,
+  .shimmer {
+    animation: none !important;
+  }
+}
+
+/* ─── Skip to content (accessibility) ─── */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  z-index: 999;
+  padding: 0.5rem 1rem;
+  background: var(--accent-cyan);
+  color: var(--bg-primary);
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 8px 0;
+}
+
+.skip-to-content:focus {
+  left: 0;
+  top: 0;
 }

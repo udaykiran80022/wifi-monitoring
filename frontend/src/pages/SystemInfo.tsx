@@ -10,7 +10,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import LoadingSpinner from "../components/shared/LoadingSpinner";
-import { useMonitorStore } from "../store/monitorStore";
+import { useWifiInfo, useNetworkInfo } from "../store/monitorStore";
 import { getCurrentStatus, getLatestSpeed } from "../services/api";
 import type { StatusLog, SpeedLog } from "../types";
 
@@ -38,7 +38,8 @@ function InfoRow({ icon: Icon, label, value, accent }: InfoRowProps) {
 }
 
 export default function SystemInfo() {
-  const store = useMonitorStore();
+  const { wifiSsid, wifiSignal } = useWifiInfo();
+  const { localIp, publicIp, isConnected } = useNetworkInfo();
   const [status, setStatus] = useState<StatusLog | null>(null);
   const [speed, setSpeed] = useState<SpeedLog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,36 +68,36 @@ export default function SystemInfo() {
         <InfoRow
           icon={Wifi}
           label="Network Name (SSID)"
-          value={store.wifiSsid}
+          value={wifiSsid}
           accent="text-accent-cyan"
         />
         <InfoRow
           icon={Radio}
           label="Signal Strength"
-          value={store.wifiSignal != null ? `${store.wifiSignal}%` : null}
+          value={wifiSignal != null ? `${wifiSignal}%` : null}
           accent="text-accent-emerald"
         />
 
         {/* Visual Signal Bar */}
-        {store.wifiSignal != null && (
+        {wifiSignal != null && (
           <div className="py-3 border-b border-white/[0.04]">
             <div className="flex items-center gap-3">
               <div className="flex-1 bg-white/5 rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all duration-500 ${
-                    store.wifiSignal >= 80
+                    wifiSignal >= 80
                       ? "bg-accent-emerald"
-                      : store.wifiSignal >= 60
+                      : wifiSignal >= 60
                       ? "bg-accent-cyan"
-                      : store.wifiSignal >= 40
+                      : wifiSignal >= 40
                       ? "bg-accent-amber"
                       : "bg-accent-red"
                   }`}
-                  style={{ width: `${store.wifiSignal}%` }}
+                  style={{ width: `${wifiSignal}%` }}
                 />
               </div>
               <span className="number-value text-sm text-white w-10 text-right">
-                {store.wifiSignal}%
+                {wifiSignal}%
               </span>
             </div>
           </div>
@@ -113,26 +114,26 @@ export default function SystemInfo() {
         <InfoRow
           icon={Network}
           label="Local IP Address"
-          value={store.localIp}
+          value={localIp}
           accent="text-accent-purple"
         />
         <InfoRow
           icon={Globe}
           label="Public IP Address"
-          value={store.publicIp}
+          value={publicIp}
           accent="text-accent-cyan"
         />
         <InfoRow
           icon={Shield}
           label="Connection Status"
           value={
-            store.isConnected === null
+            isConnected === null
               ? "Checking..."
-              : store.isConnected
+              : isConnected
               ? "Connected"
               : "Disconnected"
           }
-          accent={store.isConnected ? "text-accent-emerald" : "text-accent-red"}
+          accent={isConnected ? "text-accent-emerald" : "text-accent-red"}
         />
       </div>
 

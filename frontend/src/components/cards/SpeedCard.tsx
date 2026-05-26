@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
-import { useMonitorStore } from "../../store/monitorStore";
+import { useSpeed } from "../../store/monitorStore";
 import { getSpeedBaseline } from "../../services/api";
 import type { SpeedBaseline } from "../../types";
 
 export default function SpeedCard() {
-  const { downloadMbps, uploadMbps } = useMonitorStore();
+  const { downloadMbps, uploadMbps } = useSpeed();
   const [baseline, setBaseline] = useState<SpeedBaseline | null>(null);
 
   useEffect(() => {

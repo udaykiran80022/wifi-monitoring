@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { Menu } from "lucide-react";
 import { useMonitorStore } from "../../store/monitorStore";
+import { useSidebar } from "./SidebarContext";
+import { Badge } from "../ui/Badge";
+import { NotificationCenter } from "../ui/NotificationCenter";
+import { ConnectionHealthIndicator } from "../ui/ConnectionHealthIndicator";
 
 const pageTitles: Record<string, string> = {
   "/": "Dashboard",
@@ -13,7 +18,8 @@ const pageTitles: Record<string, string> = {
 
 export default function TopBar() {
   const location = useLocation();
-  const { isConnected, wsConnected } = useMonitorStore();
+  const isConnected = useMonitorStore((s) => s.isConnected);
+  const { isMobile, toggle } = useSidebar();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -24,48 +30,76 @@ export default function TopBar() {
   const title = pageTitles[location.pathname] || "WiFi Monitor";
 
   return (
-    <header className="h-16 bg-bg-secondary/80 backdrop-blur-md border-b border-white/[0.07] flex items-center justify-between px-6 sticky top-0 z-40">
-      {/* Page Title */}
-      <h2 className="text-lg font-semibold text-white">{title}</h2>
+    <header
+      className="h-16 bg-bg-secondary/80 backdrop-blur-md border-b border-white/[0.07] flex items-center justify-between px-4 md:px-6 sticky top-0 z-40 shrink-0"
+      role="banner"
+    >
+      {/* Left side */}
+      <div className="flex items-center gap-3">
+        {/* Mobile hamburger */}
+        {isMobile && (
+          <button
+            onClick={toggle}
+            className="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+            aria-label="Open navigation menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+      </div>
 
       {/* Right Side */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4">
         {/* Internet Status Pill */}
         <div
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+          role="status"
+          aria-live="polite"
+          aria-label={
             isConnected === null
-              ? "bg-white/5 text-slate-400"
+              ? "Checking internet connection"
               : isConnected
-              ? "bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20"
-              : "bg-accent-red/10 text-accent-red border border-accent-red/20"
-          }`}
+              ? "Internet connected"
+              : "Internet disconnected"
+          }
         >
-          <div
-            className={`w-1.5 h-1.5 rounded-full ${
+          <Badge
+            variant={
               isConnected === null
-                ? "bg-slate-500"
+                ? "neutral"
                 : isConnected
-                ? "bg-accent-emerald status-dot-connected"
-                : "bg-accent-red status-dot-disconnected"
-            }`}
-          />
-          {isConnected === null
-            ? "Checking..."
-            : isConnected
-            ? "Connected"
-            : "Disconnected"}
+                ? "success"
+                : "danger"
+            }
+            size="md"
+            dot
+            dotPulse={isConnected === false}
+          >
+            <span className="hidden sm:inline">
+              {isConnected === null
+                ? "Checking..."
+                : isConnected
+                ? "Connected"
+                : "Disconnected"}
+            </span>
+            <span className="sm:hidden">
+              {isConnected === null
+                ? "..."
+                : isConnected
+                ? "On"
+                : "Off"}
+            </span>
+          </Badge>
         </div>
 
-        {/* WebSocket Reconnecting Badge */}
-        {!wsConnected && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-accent-amber/10 text-accent-amber border border-accent-amber/20">
-            <div className="w-1.5 h-1.5 rounded-full bg-accent-amber status-dot-reconnecting" />
-            Reconnecting...
-          </div>
-        )}
+        {/* Connection Health */}
+        <ConnectionHealthIndicator />
+
+        {/* Notification Center */}
+        <NotificationCenter />
 
         {/* Current Time */}
-        <div className="text-sm text-slate-400 font-mono tabular-nums">
+        <div className="text-sm text-slate-400 font-mono tabular-nums hidden md:block">
           {currentTime.toLocaleTimeString()}
         </div>
       </div>

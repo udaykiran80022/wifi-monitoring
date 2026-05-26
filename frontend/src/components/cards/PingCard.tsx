@@ -1,8 +1,9 @@
 import { Activity } from "lucide-react";
-import { useMonitorStore } from "../../store/monitorStore";
+import { usePingMs, usePacketLoss } from "../../store/monitorStore";
 
 export default function PingCard() {
-  const { pingMs, packetLoss } = useMonitorStore();
+  const pingMs = usePingMs();
+  const packetLoss = usePacketLoss();
 
   const getPingColor = () => {
     if (pingMs == null) return "text-slate-400";

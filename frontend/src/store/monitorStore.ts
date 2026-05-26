@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useShallow } from "zustand/shallow";
 import type { LiveData, SpeedLog } from "../types";
 
 interface PingEntry {
@@ -30,6 +31,9 @@ interface MonitorState {
   // WebSocket status
   wsConnected: boolean;
 
+  // Data freshness
+  lastUpdated: number | null;
+
   // Actions
   setLiveData: (data: LiveData) => void;
   setLatestSpeed: (speed: SpeedLog | null) => void;
@@ -52,6 +56,7 @@ export const useMonitorStore = create<MonitorState>((set) => ({
   unreadAlertCount: 0,
   pingHistory: [],
   wsConnected: false,
+  lastUpdated: null,
 
   setLiveData: (data) =>
     set((state) => {
@@ -72,6 +77,7 @@ export const useMonitorStore = create<MonitorState>((set) => ({
           pingHistory: newPingEntry
             ? [...state.pingHistory.slice(-59), newPingEntry]
             : state.pingHistory,
+          lastUpdated: Date.now(),
         };
       }
 
@@ -89,12 +95,14 @@ export const useMonitorStore = create<MonitorState>((set) => ({
             server_location: data.server_location ?? null,
             result_url: null,
           },
+          lastUpdated: Date.now(),
         };
       }
 
       if (data.type === "alert") {
         return {
           unreadAlertCount: state.unreadAlertCount + 1,
+          lastUpdated: Date.now(),
         };
       }
 
@@ -113,3 +121,55 @@ export const useMonitorStore = create<MonitorState>((set) => ({
     set((state) => ({ unreadAlertCount: state.unreadAlertCount + 1 })),
   setWsConnected: (connected) => set({ wsConnected: connected }),
 }));
+
+// ─── Selector hooks for granular subscriptions ───
+// Use these instead of useMonitorStore() to avoid unnecessary rerenders.
+
+export const useIsConnected = () => useMonitorStore((s) => s.isConnected);
+export const usePingMs = () => useMonitorStore((s) => s.pingMs);
+export const usePacketLoss = () => useMonitorStore((s) => s.packetLoss);
+export const useWsConnected = () => useMonitorStore((s) => s.wsConnected);
+export const useUnreadAlertCount = () => useMonitorStore((s) => s.unreadAlertCount);
+export const useLastUpdated = () => useMonitorStore((s) => s.lastUpdated);
+export const usePingHistory = () => useMonitorStore((s) => s.pingHistory);
+export const useLatestSpeed = () => useMonitorStore((s) => s.latestSpeed);
+
+/** Select speed values (download + upload) with shallow comparison */
+export const useSpeed = () =>
+  useMonitorStore(
+    useShallow((s) => ({
+      downloadMbps: s.downloadMbps,
+      uploadMbps: s.uploadMbps,
+    }))
+  );
+
+/** Select WiFi info (ssid + signal) with shallow comparison */
+export const useWifiInfo = () =>
+  useMonitorStore(
+    useShallow((s) => ({
+      wifiSsid: s.wifiSsid,
+      wifiSignal: s.wifiSignal,
+    }))
+  );
+
+/** Select network info with shallow comparison */
+export const useNetworkInfo = () =>
+  useMonitorStore(
+    useShallow((s) => ({
+      localIp: s.localIp,
+      publicIp: s.publicIp,
+      isConnected: s.isConnected,
+    }))
+  );
+
+/** Get connection health state derived from store */
+export function useConnectionHealth(): "healthy" | "degraded" | "offline" {
+  const isConnected = useIsConnected();
+  const wsConnected = useWsConnected();
+  const lastUpdated = useLastUpdated();
+
+  if (!isConnected && isConnected !== null) return "offline";
+  if (!wsConnected) return "degraded";
+  if (lastUpdated && Date.now() - lastUpdated > 30000) return "degraded";
+  return "healthy";
+}

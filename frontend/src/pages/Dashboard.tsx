@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMonitorStore } from "../store/monitorStore";
+import { usePingHistory, useLatestSpeed } from "../store/monitorStore";
 import StatusCard from "../components/cards/StatusCard";
 import SpeedCard from "../components/cards/SpeedCard";
 import PingCard from "../components/cards/PingCard";
@@ -13,7 +13,8 @@ import type { Alert, SpeedLog } from "../types";
 import { Server, Globe } from "lucide-react";
 
 export default function Dashboard() {
-  const { pingHistory, latestSpeed } = useMonitorStore();
+  const pingHistory = usePingHistory();
+  const latestSpeed = useLatestSpeed();
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [lastSpeed, setLastSpeed] = useState<SpeedLog | null>(null);
   const [loading, setLoading] = useState(true);
