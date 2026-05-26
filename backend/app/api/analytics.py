@@ -3,12 +3,13 @@ Analytics API endpoints.
 Provides aggregated daily and hourly statistics.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, cast, Integer, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
+from app.utils.timezone import now_ist
 from app.models.tables import InternetStatusLog, SpeedTestLog
 from app.schemas.pydantic_models import DailyAnalyticsResponse, HourlyAnalyticsResponse, BaselineResponse, HeatmapResponse
 
@@ -24,7 +25,7 @@ async def get_daily_analytics(
     Get per-day analytics for the last N days.
     Includes average speeds, ping, downtime minutes, and outage count.
     """
-    since = datetime.utcnow() - timedelta(days=days)
+    since = now_ist() - timedelta(days=days)
     date_col = cast(SpeedTestLog.timestamp, Date).label("date")
 
     # Speed averages per day
@@ -94,7 +95,7 @@ async def get_hourly_analytics(
     Get per-hour averages for the last N hours.
     Returns average ping and packet loss per hour.
     """
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = now_ist() - timedelta(hours=hours)
 
     # Use date_trunc for hour grouping in PostgreSQL
     hour_col = func.date_trunc("hour", InternetStatusLog.timestamp).label("hour")

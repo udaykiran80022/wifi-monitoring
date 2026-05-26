@@ -6,10 +6,10 @@ from datetime import datetime
 from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
-UtcDatetime = Annotated[
+LocalDatetime = Annotated[
     datetime,
     PlainSerializer(
-        lambda dt: (dt.isoformat() + "Z") if dt.tzinfo is None else dt.isoformat(),
+        lambda dt: dt.isoformat(),
         return_type=str,
     )
 ]
@@ -24,7 +24,7 @@ class StatusLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: UtcDatetime
+    timestamp: LocalDatetime
     is_connected: bool
     ping_ms: float | None = None
     packet_loss: float | None = None
@@ -52,7 +52,7 @@ class SpeedTestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: UtcDatetime
+    timestamp: LocalDatetime
     download_mbps: float
     upload_mbps: float
     ping_ms: float
@@ -79,7 +79,7 @@ class AlertResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    timestamp: UtcDatetime
+    timestamp: LocalDatetime
     alert_type: str
     message: str
     severity: str
@@ -92,8 +92,8 @@ class AlertResponse(BaseModel):
 class DowntimePeriodResponse(BaseModel):
     """Response schema for a single downtime/outage period."""
 
-    started_at: UtcDatetime
-    ended_at: UtcDatetime | None = None
+    started_at: LocalDatetime
+    ended_at: LocalDatetime | None = None
     duration_minutes: float
 
 
@@ -159,7 +159,7 @@ class SettingsResponse(BaseModel):
     high_packet_loss_pct: float
     ping_interval_sec: int
     speed_test_interval_sec: int
-    updated_at: UtcDatetime | None = None
+    updated_at: LocalDatetime | None = None
 
 
 class SettingsUpdateRequest(BaseModel):

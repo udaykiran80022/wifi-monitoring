@@ -13,6 +13,7 @@ from app.config import settings
 from app.db.session import get_session
 from app.models.tables import InternetStatusLog, SpeedTestLog, Settings as SettingsModel
 from app.monitoring.ping_monitor import check_internet_ping
+from app.utils.timezone import now_ist
 from app.monitoring.wifi_monitor import get_wifi_info
 from app.monitoring.speed_monitor import run_speed_test
 from app.monitoring.ip_monitor import get_local_ip, get_public_ip
@@ -86,7 +87,7 @@ async def fast_check_job():
         ping_ms = ping_result["avg_ms"]
         packet_loss = ping_result["packet_loss_pct"]
 
-        now = datetime.utcnow()
+        now = now_ist()
 
         # Save to database
         async with get_session() as session:
@@ -143,7 +144,7 @@ async def fast_check_job():
 
         # Broadcast to WebSocket clients
         await broadcast_status_update({
-            "timestamp": now.isoformat() + "Z",
+            "timestamp": now.isoformat(),
             "is_connected": is_connected,
             "ping_ms": ping_ms,
             "packet_loss": packet_loss,
@@ -177,7 +178,7 @@ async def speed_test_job():
             logger.warning("Speed test returned no results")
             return
 
-        now = datetime.utcnow()
+        now = now_ist()
 
         # Save to database
         async with get_session() as session:
@@ -204,7 +205,7 @@ async def speed_test_job():
 
         # Broadcast to WebSocket clients
         await broadcast_speed_update({
-            "timestamp": now.isoformat() + "Z",
+            "timestamp": now.isoformat(),
             "download_mbps": result["download_mbps"],
             "upload_mbps": result["upload_mbps"],
             "ping_ms": result["ping_ms"],

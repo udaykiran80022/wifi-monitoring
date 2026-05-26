@@ -5,13 +5,13 @@ Evaluates current metrics against configured thresholds and creates alerts.
 
 import logging
 import asyncio
-from datetime import datetime
 
 from winotify import Notification, audio
 
 from app.models.tables import Alert
 from app.db.session import get_session
 from app.ws.broadcaster import broadcast_alert
+from app.utils.timezone import now_ist
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ async def check_and_create_alert(alert_type: str, message: str, severity: str):
             alert_type=alert_type,
             message=message,
             severity=severity,
-            timestamp=datetime.utcnow(),
+            timestamp=now_ist(),
         )
         session.add(alert)
         await session.commit()
@@ -42,7 +42,7 @@ async def check_and_create_alert(alert_type: str, message: str, severity: str):
         # Broadcast the new alert to all WebSocket clients
         await broadcast_alert({
             "id": alert.id,
-            "timestamp": alert.timestamp.isoformat() + "Z",
+            "timestamp": alert.timestamp.isoformat(),
             "alert_type": alert.alert_type,
             "message": alert.message,
             "severity": alert.severity,

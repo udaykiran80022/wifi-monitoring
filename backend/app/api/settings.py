@@ -2,10 +2,11 @@
 Settings API endpoints for threshold configuration.
 """
 
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.utils.timezone import now_ist
 
 from app.db.session import get_db_session
 from app.models.tables import Settings
@@ -54,7 +55,7 @@ async def update_settings(
     for key, value in update_data.items():
         setattr(row, key, value)
 
-    row.updated_at = datetime.utcnow()
+    row.updated_at = now_ist()
     await session.commit()
     await session.refresh(row)
 

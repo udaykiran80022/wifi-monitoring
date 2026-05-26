@@ -3,12 +3,13 @@ Downtime API endpoints.
 Processes internet_status_logs to find contiguous disconnected periods.
 """
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
+from app.utils.timezone import now_ist
 from app.models.tables import InternetStatusLog
 from app.schemas.pydantic_models import DowntimePeriodResponse, DowntimeSummaryResponse
 
@@ -45,7 +46,7 @@ def _compute_outage_periods(logs: list) -> list[dict]:
 
     # Handle ongoing outage (still disconnected)
     if current_outage_start is not None:
-        duration = (datetime.utcnow() - current_outage_start).total_seconds() / 60
+        duration = (now_ist() - current_outage_start).total_seconds() / 60
         outages.append({
             "started_at": current_outage_start,
             "ended_at": None,
@@ -64,7 +65,7 @@ async def get_downtime_logs(
     Get all outage periods for the last N days.
     Returns start time, end time, and duration of each outage.
     """
-    since = datetime.utcnow() - timedelta(days=days)
+    since = now_ist() - timedelta(days=days)
 
     result = await session.execute(
         select(InternetStatusLog)
@@ -88,7 +89,7 @@ async def get_downtime_summary(
     Get downtime summary statistics for the last N days.
     Returns total downtime minutes and number of outage periods.
     """
-    since = datetime.utcnow() - timedelta(days=days)
+    since = now_ist() - timedelta(days=days)
 
     result = await session.execute(
         select(InternetStatusLog)
